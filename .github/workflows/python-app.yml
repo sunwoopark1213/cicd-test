@@ -3,65 +3,59 @@ name: Python application
 # 어떤 상황에서 이 작업이 작동할지 결정합니다.
 on:
   push:
-    branches: ["main"] # main 브랜치에 코드가 올라오면 실행
+    branches: ["main"]
   pull_request:
-    branches: ["main"] # PR이란 코드 변경 요청입니다.
+    branches: ["main"]
 
-permissions:    # GitHub 토큰 권한 설정, 여기서 토큰은 GitHub가 자동으로 만들어주는 비밀번호 같은 것으로 별도의 설정 없이도 사용할 수 있습니다.
+permissions:
   contents: read
 
 jobs:
-  build-and-deploy: # 작업의 ID입니다. 자유롭게 바꿔도 무방합니다. 
-    runs-on: ubuntu-latest # 최신 우분투 가상 환경에서 실행
-    steps:  # 작업을 수행하기 위한 구체적인 단계 정의
-      - uses: actions/checkout@v4 # 현재 GitHub의 코드를 가상환경으로 가져옵니다. 변경되지 않습니다.
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
-      # --- [CI 영역 시작으로 파이썬 설치를 위한 설정부] ---
-      - name: Set up Python 3.14.0  # 파이썬 3.14.0 버전 설정
-        uses: actions/setup-python@v5 # 파이썬 설정 액션 사용, 일반적으로 python setup github action식으로 검색을 통해 값을 확인 합니다. (v4 → v5 업데이트)
-        with:                         # 버전의 경우 깃허브에 검색된 페이지 사이드 메뉴의 Releases를 확인 하면 됩니다.  
-          python-version: "3.14.0" # 요청하신 최신 파이썬 버전 설정
+    # Python 설정
+    - name: Set up Python 3.14.0
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.14.0"
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8 pytest # 검사 도구 설치
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      # --- [CI 영역 끝] ---
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      # --- [CD 영역 시작: 도커 이미지 생성] ---
-      # 1. 도커 허브 계정에 로그인합니다. (비밀번호 대신 Token 사용)
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3    # docker login github action으로 검색
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}   # 도커 허브 아이디 환경변수(Secrets에서 가져옴)
-          password: ${{ secrets.DOCKERHUB_TOKEN }}      # 도커 허브 비밀번호 대신 토큰 환경변수(Secrets에서 가져옴)
+    # Docker Hub 로그인
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 2. Dockerfile을 읽어 이미지를 만들고(Build), 도커 허브로 전송(Push)합니다.
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5  # v4 → v5 최신 버전
-        with:
-          context: . # 현재 위치의 파일을 소스로 사용
-          push: true # 빌드 성공 시 자동으로 도커 허브에 업로드
-          tags: "${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest" # 이미지 이름표
-      # --- [CD 영역 끝: 도커 이미지 생성] ---
+    # Docker 빌드/푸시
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: "${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest"
 
-      # --- [CD 영역 시작: EC2 실 배포] ---
-      # 3. SSH를 통해 EC2 서버에 접속합니다. 이후 script에 적힌 명령어들을 순서대로 실행합니다.
+    # EC2 배포
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
         script: |
-          # Docker 설치 확인
-          command -v docker || (curl -fsSL https://get.docker.com | sh && newgrp docker)
-          command -v docker-compose || sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose
-          
-          # 프로젝트 디렉토리
           mkdir -p /home/ubuntu/cicd-test
           cd /home/ubuntu/cicd-test
-          
-          # git clone (깨끗하게)
           rm -rf *
           git clone https://github.com/sun1213/cicd-test.git .
-          
-          # 배포
+          command -v docker-compose || sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose
           docker-compose down || true
           docker-compose up -d --build
           docker-compose ps
