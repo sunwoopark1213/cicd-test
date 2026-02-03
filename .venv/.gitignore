@@ -1,17 +1,28 @@
-from fastapi import FastAPI
-import uvicorn
+# === 1. 보안 및 환경 변수 (최우선 제외) ===
+.env                # API 키, DB 비밀번호 등 민감 정보
+*.pem               # AWS 접속용 키 페어
+*.key               # 암호화 키 파일
 
-# 1. FastAPI 인스턴스 생성
-app = FastAPI()
+# === 2. Python 가상 환경 및 패키지 ===
+venv/               # 가상 환경 폴더 (주로 사용하는 이름)
+.venv/              # 표준 가상 환경 폴더
+env/
+bin/
+lib/
+include/
 
-# 2. 기본 경로(Root) 설정
-@app.get("/")
-def read_root():
-    return {"Hello": "World", "Status": "Success"}
-# 3. 경로 파라미터 예시 (아이템 조회)
-# @app.get("/items/{item_id}")
-# def read_item(item_id: int, q: str = None):
-#     return {"item_id": item_id, "query": q}
+# === 3. Python 캐시 및 컴파일 파일 ===
+__pycache__/        # 런타임 시 생성되는 바이트코드 캐시
+*.py[cod]           # .pyc, .pyo, .pyd 파일
+*$py.class
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+# === 4. 운영체제 및 도구 설정 ===
+.DS_Store           # macOS 전용 시스템 파일
+Thumbs.db           # Windows 전용 썸네일 파일
+.vscode/            # VS Code 개인 설정 (팀별로 다를 수 있음)
+.idea/              # PyCharm 설정 파일
+
+# === 5. 빌드 및 배포 결과물 ===
+build/
+dist/
+*.egg-info/
