@@ -48,21 +48,20 @@ jobs:
 
       # --- [CD 영역 시작: EC2 실 배포] ---
       # 3. SSH를 통해 EC2 서버에 접속합니다. 이후 script에 적힌 명령어들을 순서대로 실행합니다.
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}  # ec2-user (Amazon Linux) 또는 ubuntu
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            # 기존 컨테이너 정리
-            docker-compose -f /home/ec2-user/cicd-test/docker-compose.yml down || true
-            
-            # 최신 코드 git pull (clone 대신 효율적)
-            cd /home/ec2-user/cicd-test || git clone https://github.com/sun1213/cicd-test.git /home/ec2-user/cicd-test
-            cd /home/ec2-user/cicd-test
-            
-            # docker-compose 배포 (nginx + FastAPI)
-            docker-compose up -d
-            docker-compose ps  # 상태 출력
-            docker ps  # 전체 컨테이너 확인
+        script: |
+          # Docker 설치 확인
+          command -v docker || (curl -fsSL https://get.docker.com | sh && newgrp docker)
+          command -v docker-compose || sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose
+          
+          # 프로젝트 디렉토리
+          mkdir -p /home/ubuntu/cicd-test
+          cd /home/ubuntu/cicd-test
+          
+          # git clone (깨끗하게)
+          rm -rf *
+          git clone https://github.com/sun1213/cicd-test.git .
+          
+          # 배포
+          docker-compose down || true
+          docker-compose up -d --build
+          docker-compose ps
