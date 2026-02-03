@@ -1,10 +1,10 @@
+# .github/workflows/nginx-deploy.yml (nginx 빠른 재배포)
 name: Nginx Deploy
 
 on:
   push:
     paths:
       - 'nginx.conf'
-      - 'docker-compose.yml'
     branches: ["main"]
 
 jobs:
@@ -13,32 +13,30 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Deploy Nginx to EC2
+    - name: Deploy Nginx Only to EC2
       uses: appleboy/ssh-action@v1.0.3
       with:
-        host: ${{ secrets.HOST }}  # 44.195.60.195
-        username: ${{ secrets.USERNAME }}  # ubuntu
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         script: |
-          # 안전한 디렉토리/코드 업데이트
-          mkdir -p /home/ubuntu/cicd-test
-          cd /home/ubuntu/cicd-test
+          # 공통 준비 (Docker/Compose/Git)
+          sudo systemctl start docker || true
+          newgrp docker || true
           
-          # git pull (없으면 clone)
-          if [ ! -d ".git" ]; then
-            git clone https://github.com/sun1213/cicd-test.git .
-          else
-            git pull origin main
-          fi
-          
-          # docker-compose 확인/설치
-          command -v docker-compose || {
+          command -v docker-compose >/dev/null 2>&1 || {
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
           }
           
-          # nginx만 재배포
+          cd /home/ubuntu/cicd-test || (git clone https://github.com/sun1213/cicd-test.git /home/ubuntu/cicd-test && cd /home/ubuntu/cicd-test)
+          git pull origin main
+          sudo chown -R ubuntu:ubuntu /home/ubuntu/cicd-test
+          
+          # nginx만 재시작 (빌드 X)
           docker-compose down nginx || true
           docker-compose up -d nginx
+          sleep 5
           docker-compose ps nginx
           docker ps | grep nginx
+          curl -I http://localhost || echo "Nginx reloaded"
