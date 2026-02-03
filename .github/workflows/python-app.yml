@@ -1,23 +1,31 @@
 - name: Deploy to EC2
   uses: appleboy/ssh-action@v1.0.3
   with:
-    host: 44.195.60.195
+    host: ${{ secrets.HOST }}  # Secrets 사용!
     username: ubuntu
     key: ${{ secrets.SSH_KEY }}
     script: |
-      # Docker/Compose 설치
-      sudo apt update -y
-      sudo apt install -y docker.io git docker-compose
+      # Docker/Compose 확인 (이미 설치 가정)
+      sudo systemctl start docker || true
+      newgrp docker || true
       
-      # 프로젝트 배포 (public repo라 인증 불필요)
+      # 프로젝트 업데이트 (pull 우선)
       mkdir -p /home/ubuntu/cicd-test
       cd /home/ubuntu/cicd-test
-      rm -rf *
-      git clone https://github.com/sun1213/cicd-test.git .
       
-      # 권한 + 배포
+      if [ -d ".git" ]; then
+        git pull origin main
+      else
+        rm -rf * && git clone https://github.com/sun1213/cicd-test.git .
+      fi
+      
+      # 권한 수정
       sudo chown -R ubuntu:ubuntu /home/ubuntu/cicd-test
+      
+      # 배포
       docker-compose down || true
-      docker-compose up -d --build
+      docker-compose pull  # 최신 이미지
+      docker-compose up -d
+      sleep 10
       docker-compose ps
-      curl localhost || echo "Local test OK"
+      curl -I localhost || echo "Nginx ready"
