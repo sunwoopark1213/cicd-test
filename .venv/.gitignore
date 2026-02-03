@@ -26,3 +26,4 @@ Thumbs.db           # Windows 전용 썸네일 파일
 build/
 dist/
 *.egg-info/
+
