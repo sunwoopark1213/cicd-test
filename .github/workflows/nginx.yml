@@ -1,0 +1,27 @@
+name: Nginx Deploy
+
+on:
+  push:
+    paths:
+      - 'nginx.conf'
+      - 'docker-compose.yml'
+    branches: ["main"]
+
+jobs:
+  deploy-nginx:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy Nginx to EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}  # 44.195.60.195
+        username: ${{ secrets.USERNAME }}  # ubuntu
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd /home/ubuntu/cicd-test
+          git pull origin main
+          docker-compose down nginx || true
+          docker-compose up -d nginx
+          docker-compose ps nginx

@@ -49,21 +49,20 @@ jobs:
       # --- [CD 영역 시작: EC2 실 배포] ---
       # 3. SSH를 통해 EC2 서버에 접속합니다. 이후 script에 적힌 명령어들을 순서대로 실행합니다.
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3  # master → 안정 버전 v1.0.3
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.HOST }} # EC2의 주소 (Secrets에서 가져옴)
-          username: ${{ secrets.USERNAME }} # 접속 계정 (ubuntu)
-          key: ${{ secrets.SSH_KEY }} # .pem 키 파일 내용
-
-          # 접속 성공 후 EC2 안에서 실행할 리눅스 명령어들입니다. 파이프 기호 다음에 띄워서는 안됩니다.
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}  # ec2-user (Amazon Linux) 또는 ubuntu
+          key: ${{ secrets.SSH_KEY }}
           script: |
-            # 도커 허브에서 방금 만든 이미지를 내려받습니다.
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest
-
-            # 기존에 돌아가던 구버전 컨테이너를 끄고 삭제합니다. (없으면 통과)
-            sudo docker stop fastapi-server || true
-            sudo docker rm fastapi-server || true
-
-            # 새 이미지를 8000번 포트로 실행합니다. (-d: 백그라운드 실행)
-            sudo docker run -d --name fastapi-server -p 8000:8000 ${{ secrets.DOCKERHUB_USERNAME }}/fastapi-app:latest
-      # --- [신규 CD 영역 끝: EC2 실 배포] ---
+            # 기존 컨테이너 정리
+            docker-compose -f /home/ec2-user/cicd-test/docker-compose.yml down || true
+            
+            # 최신 코드 git pull (clone 대신 효율적)
+            cd /home/ec2-user/cicd-test || git clone https://github.com/sun1213/cicd-test.git /home/ec2-user/cicd-test
+            cd /home/ec2-user/cicd-test
+            
+            # docker-compose 배포 (nginx + FastAPI)
+            docker-compose up -d
+            docker-compose ps  # 상태 출력
+            docker ps  # 전체 컨테이너 확인
